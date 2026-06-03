@@ -1,13 +1,31 @@
 'use strict';
 
 // ── State ────────────────────────────────────────────────────────────────────
-let allCards   = [];
-let progress   = {};
-let customCards = [];
-let queue      = [];
-let queueIndex = 0;
+let allCards      = [];
+let progress      = {};
+let customCards   = [];
+let queue         = [];
+let queueIndex    = 0;
 let sessionCorrect = 0;
-let cardFlipped = false;
+let cardFlipped   = false;
+let activeCategory = 'all';
+
+const CATEGORY_LABELS = {
+  all:        'All',
+  greetings:  'Greetings',
+  people:     'People',
+  actions:    'Actions',
+  adjectives: 'Adjectives',
+  numbers:    'Numbers',
+  time:       'Time',
+  food:       'Food & Drink',
+  places:     'Places',
+  objects:    'Objects',
+  directions: 'Directions',
+  questions:  'Questions',
+  basics:     'Basics',
+  phrases:    'Phrases',
+};
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const screens = {
@@ -119,6 +137,7 @@ async function init() {
   }
 
   allCards = [...hsk, ...customCards];
+  buildFilterRow();
   buildSession();
 
   if (queue.length === 0) {
@@ -129,10 +148,32 @@ async function init() {
   }
 }
 
+// ── Filter row ────────────────────────────────────────────────────────────────
+function buildFilterRow() {
+  const row = document.getElementById('filter-row');
+  row.innerHTML = '';
+
+  // Collect categories present in the deck, in the order defined by CATEGORY_LABELS
+  const present = new Set(allCards.map(c => c.category).filter(Boolean));
+  const order = Object.keys(CATEGORY_LABELS).filter(k => k === 'all' || present.has(k));
+
+  order.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (cat === activeCategory ? ' active' : '');
+    btn.textContent = CATEGORY_LABELS[cat] || cat;
+    btn.dataset.category = cat;
+    row.appendChild(btn);
+  });
+}
+
 // ── Session ───────────────────────────────────────────────────────────────────
 function buildSession() {
   const t = today();
-  queue = allCards.filter(card => {
+  const pool = activeCategory === 'all'
+    ? allCards
+    : allCards.filter(c => c.category === activeCategory);
+
+  queue = pool.filter(card => {
     const p = progress[card.id];
     if (!p) return true;
     return p.due <= t;
@@ -348,12 +389,13 @@ function renderCustomList() {
   });
 }
 
-function addCustomCard(english, pinyin, characters, type) {
+function addCustomCard(english, pinyin, characters, type, category) {
   const id = 'custom_' + Date.now();
-  const card = { id, english, pinyin, characters, type };
+  const card = { id, english, pinyin, characters, type, category };
   customCards.push(card);
   allCards.push(card);
   saveCustom();
+  buildFilterRow();
   return card;
 }
 
@@ -410,6 +452,18 @@ document.querySelector('.modal-backdrop').addEventListener('click', () => {
   document.getElementById('modal-info').classList.add('hidden');
 });
 
+// Filter row
+document.getElementById('filter-row').addEventListener('click', (e) => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  activeCategory = btn.dataset.category;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  buildSession();
+  if (queue.length === 0) showDone();
+  else { showScreen('study'); renderCard(); }
+});
+
 // Add card nav button
 document.getElementById('btn-add-nav').addEventListener('click', () => {
   renderCustomList();
@@ -437,10 +491,11 @@ document.getElementById('add-card-form').addEventListener('submit', (e) => {
   const pinyin     = el.newPinyin.value.trim();
   const characters = el.newChars.value.trim();
   const type       = el.newType.value;
+  const category   = document.getElementById('new-category').value;
 
   if (!english || !pinyin || !characters) return;
 
-  addCustomCard(english, pinyin, characters, type);
+  addCustomCard(english, pinyin, characters, type, category);
 
   // Reset form
   el.newEnglish.value = '';

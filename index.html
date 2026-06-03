@@ -21,6 +21,10 @@
       <button id="btn-add-nav" title="Add card">＋</button>
     </header>
 
+    <div id="filter-row" role="group" aria-label="Filter by category">
+      <!-- populated by JS -->
+    </div>
+
     <main>
       <div id="card-scene">
         <div id="card">
@@ -98,6 +102,24 @@
         <select id="new-type">
           <option value="word">Word</option>
           <option value="phrase">Phrase</option>
+        </select>
+      </label>
+      <label>
+        Category
+        <select id="new-category">
+          <option value="greetings">Greetings</option>
+          <option value="people">People</option>
+          <option value="actions">Actions</option>
+          <option value="adjectives">Adjectives</option>
+          <option value="numbers">Numbers</option>
+          <option value="time">Time</option>
+          <option value="food">Food &amp; Drink</option>
+          <option value="places">Places</option>
+          <option value="objects">Objects</option>
+          <option value="directions">Directions</option>
+          <option value="questions">Questions</option>
+          <option value="basics">Basics</option>
+          <option value="phrases">Phrases</option>
         </select>
       </label>
       <button type="submit" class="btn-primary">Add Card</button>

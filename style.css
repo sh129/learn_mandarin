@@ -78,6 +78,39 @@ html, body {
   flex-shrink: 0;
 }
 
+/* ── Filter row ─────────────────────────────────────────────────────── */
+#filter-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex-shrink: 0;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+}
+#filter-row::-webkit-scrollbar { display: none; }
+
+.filter-btn {
+  flex-shrink: 0;
+  border: 1.5px solid #ddd;
+  background: white;
+  color: var(--gray);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.filter-btn.active {
+  background: var(--red);
+  color: white;
+  border-color: var(--red);
+}
+
 /* ── Card area ──────────────────────────────────────────────────────── */
 #screen-study main {
   flex: 1;
