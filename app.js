@@ -153,15 +153,14 @@ function renderCard() {
   const card = queue[queueIndex];
   cardFlipped = false;
 
-  // Reset UI
+  // Reset to English (front) side
   el.card.classList.remove('flipped');
-  el.cardFront.classList.remove('hidden');
-  el.cardBack.classList.add('hidden');
   el.frontButtons.classList.remove('hidden');
   el.backButtons.classList.add('hidden');
-  el.speechResult.classList.add('hidden');
   el.speechResult.className = 'hidden';
   el.speechStatus.textContent = '';
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  el.btnTts.classList.remove('speaking');
 
   // Clear grade highlights
   document.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('highlighted'));
@@ -194,18 +193,19 @@ function renderCard() {
 }
 
 function flipCard() {
-  if (cardFlipped) return;
-  cardFlipped = true;
+  cardFlipped = !cardFlipped;
+  el.card.classList.toggle('flipped', cardFlipped);
+  el.frontButtons.classList.toggle('hidden', cardFlipped);
+  el.backButtons.classList.toggle('hidden', !cardFlipped);
 
-  el.card.classList.add('flipped');
-
-  setTimeout(() => {
-    el.cardFront.classList.add('hidden');
-    el.cardBack.classList.remove('hidden');
-  }, 150);
-
-  el.frontButtons.classList.add('hidden');
-  el.backButtons.classList.remove('hidden');
+  if (!cardFlipped) {
+    // Flipped back to English side — clear speech feedback
+    el.speechResult.className = 'hidden';
+    el.speechStatus.textContent = '';
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    el.btnTts.classList.remove('speaking');
+    document.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('highlighted'));
+  }
 }
 
 // ── Grading ───────────────────────────────────────────────────────────────────
@@ -379,9 +379,9 @@ function deleteCustomCard(index) {
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
-// Tap card front to reveal
+// Tap card to flip (toggle front ↔ back)
 document.getElementById('card').addEventListener('click', () => {
-  if (!cardFlipped) flipCard();
+  flipCard();
 });
 
 // TTS button
@@ -396,10 +396,10 @@ document.getElementById('btn-speak').addEventListener('click', (e) => {
   startSpeech();
 });
 
-// Reveal button
+// Reveal button — only flips forward (it's hidden once on the back side)
 document.getElementById('btn-reveal').addEventListener('click', (e) => {
   e.stopPropagation();
-  flipCard();
+  if (!cardFlipped) flipCard();
 });
 
 // Grade buttons — speech highlights a suggestion, user's tap is always the final grade

@@ -95,6 +95,7 @@ html, body {
   max-width: 420px;
   flex: 1;
   max-height: 340px;
+  perspective: 700px;
 }
 
 #card {
@@ -102,6 +103,12 @@ html, body {
   height: 100%;
   cursor: pointer;
   position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.38s ease;
+}
+
+#card.flipped {
+  transform: rotateY(180deg);
 }
 
 .card-face {
@@ -116,6 +123,12 @@ html, body {
   padding: 28px 24px;
   gap: 12px;
   text-align: center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-back {
+  transform: rotateY(180deg);
 }
 
 #card-type-badge {
@@ -180,18 +193,6 @@ html, body {
 .btn-tts:active { transform: scale(0.92); }
 .btn-tts.speaking { border-color: var(--red); animation: pulse 0.8s infinite; }
 
-/* card flip animation */
-#card.flipped .card-front { animation: flipOut 0.18s ease forwards; }
-#card.flipped .card-back  { animation: flipIn  0.18s ease 0.12s forwards; }
-
-@keyframes flipOut {
-  from { transform: rotateY(0deg); opacity: 1; }
-  to   { transform: rotateY(-90deg); opacity: 0; }
-}
-@keyframes flipIn {
-  from { transform: rotateY(90deg);  opacity: 0; }
-  to   { transform: rotateY(0deg);   opacity: 1; }
-}
 
 /* ── Speech area ────────────────────────────────────────────────────── */
 #speech-area {
