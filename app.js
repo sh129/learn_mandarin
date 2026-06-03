@@ -563,64 +563,79 @@ function hfListen(card) {
   if (!handsFreeActive) return;
 
   const isZhEn    = card._direction === 'zh-en';
-  const startTime = Date.now();
+  const listenStart = Date.now();
   let handled     = false;
 
   el.speechStatus.textContent = isZhEn
     ? '🎙 Say the English… (or "pass")'
     : '🎙 Say the Mandarin… (or "pass")';
 
-  function attempt() {
+  // One instance per card — restart the same instance via onend rather than
+  // creating new instances on every no-speech retry (Android throttles after ~10 creates)
+  if (hfRecognition) { try { hfRecognition.abort(); } catch(e) {} }
+
+  const rec = new SpeechRecognition();
+  hfRecognition = rec;
+  rec.lang            = isZhEn ? 'en-US' : 'zh-CN';
+  rec.interimResults  = false;
+  rec.maxAlternatives = 3;
+
+  rec.onresult = (e) => {
+    if (handled) return;
+    handled = true;
+    const alts = Array.from(e.results[0]).map(r => r.transcript.trim());
+    const raw  = alts[0].toLowerCase();
+    if (raw.includes('pass') || raw.includes('跳') || raw.includes('不知道')) {
+      hfHandlePass(card);
+    } else if (isZhEn) {
+      const correct = alts.some(a =>
+        a.toLowerCase().includes(card.english.toLowerCase()) ||
+        card.english.toLowerCase().includes(a.toLowerCase())
+      );
+      hfHandleAnswer(card, correct);
+    } else {
+      hfHandleAnswer(card, checkSpeechMatch(alts, card.characters));
+    }
+  };
+
+  rec.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      if (!handled) {
+        handled = true;
+        stopHandsFreeMode();
+        el.speechStatus.textContent = 'Microphone access lost — tap 🎧 to restart.';
+      }
+    }
+    // All other errors fall through to onend which handles restart
+  };
+
+  rec.onend = () => {
     if (handled || !handsFreeActive) return;
-
-    hfRecognition = new SpeechRecognition();
-    hfRecognition.lang            = isZhEn ? 'en-US' : 'zh-CN';
-    hfRecognition.interimResults  = false;
-    hfRecognition.maxAlternatives = 3;
-
-    hfRecognition.onresult = (e) => {
-      if (handled) return;
-      handled = true;
-      const alts = Array.from(e.results[0]).map(r => r.transcript.trim());
-      const raw  = alts[0].toLowerCase();
-      if (raw.includes('pass') || raw.includes('跳') || raw.includes('不知道')) {
-        hfHandlePass(card);
-      } else if (isZhEn) {
-        const correct = alts.some(a =>
-          a.toLowerCase().includes(card.english.toLowerCase()) ||
-          card.english.toLowerCase().includes(a.toLowerCase())
-        );
-        hfHandleAnswer(card, correct);
-      } else {
-        hfHandleAnswer(card, checkSpeechMatch(alts, card.characters));
-      }
-    };
-
-    hfRecognition.onerror = (e) => {
-      if (handled || e.error === 'aborted') return;
-      const retryable = ['no-speech', 'network', 'audio-capture'];
-      if (retryable.includes(e.error)) {
-        if (Date.now() - startTime >= 60000) {
-          handled = true;
-          hfHandlePass(card);
-        } else {
-          setTimeout(attempt, e.error === 'no-speech' ? 300 : 800);
-        }
-        return;
-      }
+    if (Date.now() - listenStart >= 60000) {
       handled = true;
       hfHandlePass(card);
-    };
-
-    // start() can throw if the mic isn't fully released yet — retry if so
-    try {
-      hfRecognition.start();
-    } catch (e) {
-      setTimeout(attempt, 600);
+      return;
     }
-  }
+    // Restart the same instance — avoids Android instance-count throttling
+    setTimeout(() => {
+      if (handled || !handsFreeActive) return;
+      try { rec.start(); } catch(e) {
+        setTimeout(() => {
+          if (handled || !handsFreeActive) return;
+          try { rec.start(); } catch(e2) { handled = true; hfHandlePass(card); }
+        }, 1000);
+      }
+    }, 250);
+  };
 
-  attempt();
+  try {
+    rec.start();
+  } catch(e) {
+    setTimeout(() => {
+      if (handled || !handsFreeActive) return;
+      try { rec.start(); } catch(e2) { handled = true; hfHandlePass(card); }
+    }, 800);
+  }
 }
 
 function hfHandlePass(card) {
@@ -671,22 +686,23 @@ function hfRepeatStep(card, onDone) {
   if (!handsFreeActive || !SpeechRecognition) { onDone(); return; }
 
   const isZhEn = card._direction === 'zh-en';
-  el.speechStatus.textContent = isZhEn ? '🎙 Say it in English…' : '🎙 Your turn…';
   let handled  = false;
 
-  // Use a LOCAL reference — the global hfRecognition may be reassigned by
-  // the time this timeout fires, which would abort the wrong recognition.
+  el.speechStatus.textContent = isZhEn ? '🎙 Say it in English…' : '🎙 Your turn…';
+
+  if (hfRecognition) { try { hfRecognition.abort(); } catch(e) {} }
+
   const rec = new SpeechRecognition();
   hfRecognition = rec;
   rec.lang            = isZhEn ? 'en-US' : 'zh-CN';
   rec.interimResults  = false;
   rec.maxAlternatives = 3;
 
+  // 10-second timeout — if user doesn't speak just move on
   const timeout = setTimeout(() => {
     if (handled) return;
     handled = true;
-    try { rec.abort(); } catch (e) {}   // abort THIS recognition, not the global
-    el.speechStatus.textContent = '';
+    try { rec.abort(); } catch(e) {}
     onDone();
   }, 10000);
 
@@ -710,15 +726,17 @@ function hfRepeatStep(card, onDone) {
   };
 
   rec.onerror = (e) => {
-    if (handled || e.error === 'aborted') return;
-    handled = true;
-    clearTimeout(timeout);
-    onDone();
+    // Let the 10s timeout handle most cases; only stop on fatal errors
+    if ((e.error === 'not-allowed' || e.error === 'service-not-allowed') && !handled) {
+      handled = true;
+      clearTimeout(timeout);
+      onDone();
+    }
   };
 
   try {
     rec.start();
-  } catch (e) {
+  } catch(e) {
     clearTimeout(timeout);
     handled = true;
     setTimeout(onDone, 500);
