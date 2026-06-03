@@ -164,6 +164,22 @@ html, body {
   margin-top: 4px;
 }
 
+/* TTS button */
+.btn-tts {
+  background: none;
+  border: 2px solid #e0e0e0;
+  border-radius: 50%;
+  width: 44px; height: 44px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, transform 0.1s;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.btn-tts:active { transform: scale(0.92); }
+.btn-tts.speaking { border-color: var(--red); animation: pulse 0.8s infinite; }
+
 /* card flip animation */
 #card.flipped .card-front { animation: flipOut 0.18s ease forwards; }
 #card.flipped .card-back  { animation: flipIn  0.18s ease 0.12s forwards; }

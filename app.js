@@ -28,6 +28,7 @@ const el = {
   cardChars:     document.getElementById('card-characters'),
   cardPinyin:    document.getElementById('card-pinyin'),
   cardEnSmall:   document.getElementById('card-english-small'),
+  btnTts:        document.getElementById('btn-tts'),
   speechStatus:  document.getElementById('speech-status'),
   speechResult:  document.getElementById('speech-result'),
   frontButtons:  document.getElementById('front-buttons'),
@@ -67,6 +68,19 @@ function sm2(prev, level) {
   due.setDate(due.getDate() + interval);
 
   return { interval, easeFactor, repetitions, due: dateStr(due) };
+}
+
+// ── Text-to-speech ────────────────────────────────────────────────────────────
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'zh-CN';
+  utterance.rate = 0.85;
+  el.btnTts.classList.add('speaking');
+  utterance.onend = () => el.btnTts.classList.remove('speaking');
+  utterance.onerror = () => el.btnTts.classList.remove('speaking');
+  speechSynthesis.speak(utterance);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -155,11 +169,22 @@ function renderCard() {
   // Front content
   el.cardEnglish.textContent  = card.english;
   el.cardTypeBadge.textContent = card.type === 'phrase' ? 'phrase' : 'word';
+  const isNew = !progress[card.id];
+  document.getElementById('card-hint').textContent =
+    isNew ? 'new card — revealing so you can learn it' : 'think it → tap to reveal';
 
   // Back content (pre-populate so flip reveals it)
   el.cardChars.textContent   = card.characters;
   el.cardPinyin.textContent  = card.pinyin;
   el.cardEnSmall.textContent = card.english;
+
+  // Auto-reveal new cards so you can learn before being tested
+  if (isNew) {
+    setTimeout(() => {
+      flipCard();
+      speak(card.characters);
+    }, 400);
+  }
 
   // Progress
   const done  = queueIndex;
@@ -357,6 +382,12 @@ function deleteCustomCard(index) {
 // Tap card front to reveal
 document.getElementById('card').addEventListener('click', () => {
   if (!cardFlipped) flipCard();
+});
+
+// TTS button
+document.getElementById('btn-tts').addEventListener('click', (e) => {
+  e.stopPropagation();
+  speak(queue[queueIndex].characters);
 });
 
 // Speak button
