@@ -110,52 +110,33 @@ function speak(text) {
 }
 
 // ── Audio feedback ────────────────────────────────────────────────────────────
-let _audioCtx = null;
-
-// Create the context on the first user gesture so it starts in running state
-document.addEventListener('pointerdown', function warmAudio() {
-  if (_audioCtx) return;
-  try {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  } catch (e) {}
-}, { passive: true });
-
-async function _playTones(tones) {
-  try {
-    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    // Wait for resume to fully complete before reading currentTime
-    if (_audioCtx.state !== 'running') await _audioCtx.resume();
-    const now = _audioCtx.currentTime;
-    tones.forEach(([freq, offset, dur, gain, freqEnd]) => {
-      const osc = _audioCtx.createOscillator();
-      const vol = _audioCtx.createGain();
-      osc.connect(vol);
-      vol.connect(_audioCtx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + offset);
-      if (freqEnd !== undefined) {
-        osc.frequency.linearRampToValueAtTime(freqEnd, now + offset + dur);
-      }
-      vol.gain.setValueAtTime(gain, now + offset);
-      vol.gain.exponentialRampToValueAtTime(0.001, now + offset + dur);
-      osc.start(now + offset);
-      osc.stop(now + offset + dur + 0.01);
-    });
-  } catch (e) {}
+// Generate a WAV blob URL from a sine wave — avoids AudioContext gesture restrictions
+function _makeWAV(freq, dur, gain, endFreq) {
+  const rate = 22050;
+  const n    = Math.ceil(rate * dur);
+  const buf  = new ArrayBuffer(44 + n * 2);
+  const d    = new DataView(buf);
+  const str  = (o, s) => [...s].forEach((c, i) => d.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); d.setUint32(4, 36 + n * 2, true);
+  str(8, 'WAVE'); str(12, 'fmt ');
+  d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true);
+  d.setUint32(24, rate, true); d.setUint32(28, rate * 2, true);
+  d.setUint16(32, 2, true); d.setUint16(34, 16, true);
+  str(36, 'data'); d.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const frac = i / n;
+    const f    = endFreq ? freq + (endFreq - freq) * frac : freq;
+    const env  = Math.min(frac / 0.05, 1) * Math.min((1 - frac) / 0.2, 1);
+    d.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * f * (i / rate)) * gain * env * 32767), true);
+  }
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
 }
 
-function playCorrectSound() {
-  _playTones([
-    [659, 0,    0.09, 0.22],        // E5
-    [988, 0.07, 0.15, 0.22],        // B5
-  ]);
-}
+const _CORRECT_URL   = _makeWAV(880, 0.18, 0.3);          // A5 ding
+const _INCORRECT_URL = _makeWAV(260, 0.22, 0.2, 120);     // descending whomp
 
-function playIncorrectSound() {
-  _playTones([
-    [280, 0, 0.22, 0.15, 130],      // descending whomp
-  ]);
-}
+function playCorrectSound()   { try { new Audio(_CORRECT_URL).play();   } catch(e) {} }
+function playIncorrectSound() { try { new Audio(_INCORRECT_URL).play(); } catch(e) {} }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function dateStr(d) {
@@ -508,11 +489,24 @@ function deleteCustomCard(index) {
 
 // ── Hands-free mode ───────────────────────────────────────────────────────────
 
-function startHandsFreeMode() {
+async function startHandsFreeMode() {
   if (!SpeechRecognition) {
     el.speechStatus.textContent = 'Speech recognition not supported in this browser.';
     return;
   }
+
+  // Request mic permission NOW during the user gesture.
+  // This is required on Android Chrome — recognition.start() called from a
+  // timer/callback is blocked unless permission was already granted this session.
+  el.speechStatus.textContent = 'Requesting microphone…';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(t => t.stop()); // we only needed the permission grant
+  } catch (e) {
+    el.speechStatus.textContent = 'Microphone access is needed for hands-free mode.';
+    return;
+  }
+
   handsFreeActive = true;
   document.getElementById('btn-hf-start').classList.add('hf-active');
   el.frontButtons.classList.add('hidden');
