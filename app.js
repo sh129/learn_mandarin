@@ -166,24 +166,13 @@ function renderCard() {
   document.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('highlighted'));
 
   // Front content
-  el.cardEnglish.textContent  = card.english;
+  el.cardEnglish.textContent   = card.english;
   el.cardTypeBadge.textContent = card.type === 'phrase' ? 'phrase' : 'word';
-  const isNew = !progress[card.id];
-  document.getElementById('card-hint').textContent =
-    isNew ? 'new card — revealing so you can learn it' : 'think it → tap to reveal';
 
-  // Back content (pre-populate so flip reveals it)
+  // Back content (pre-populated so the flip reveals it instantly)
   el.cardChars.textContent   = card.characters;
   el.cardPinyin.textContent  = card.pinyin;
   el.cardEnSmall.textContent = card.english;
-
-  // Auto-reveal new cards so you can learn before being tested
-  if (isNew) {
-    setTimeout(() => {
-      flipCard();
-      speak(card.characters);
-    }, 400);
-  }
 
   // Progress
   const done  = queueIndex;
@@ -407,6 +396,18 @@ document.getElementById('back-buttons').addEventListener('click', (e) => {
   const btn = e.target.closest('.grade-btn');
   if (!btn) return;
   gradeCard(parseInt(btn.dataset.grade, 10));
+});
+
+// Info modal
+document.getElementById('btn-info').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('modal-info').classList.remove('hidden');
+});
+document.getElementById('btn-info-close').addEventListener('click', () => {
+  document.getElementById('modal-info').classList.add('hidden');
+});
+document.querySelector('.modal-backdrop').addEventListener('click', () => {
+  document.getElementById('modal-info').classList.add('hidden');
 });
 
 // Add card nav button

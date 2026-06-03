@@ -27,7 +27,7 @@
           <div class="card-face card-front">
             <span id="card-type-badge"></span>
             <p id="card-english"></p>
-            <p id="card-hint" class="hint">think it → tap to reveal</p>
+            <p class="hint">tap card to reveal</p>
           </div>
           <div class="card-face card-back">
             <p id="card-characters"></p>
@@ -57,6 +57,7 @@
         <button class="grade-btn grade-again" data-grade="0">Again</button>
         <button class="grade-btn grade-good"  data-grade="1">Good</button>
         <button class="grade-btn grade-easy"  data-grade="2">Easy</button>
+        <button id="btn-info" class="btn-info" title="What do these mean?">ℹ</button>
       </div>
     </footer>
   </div>
@@ -110,6 +111,30 @@
     <div class="loading-content">
       <div class="loading-char">你</div>
       <p>Loading cards…</p>
+    </div>
+  </div>
+
+  <!-- ── Info modal ──────────────────────────────────────────────────── -->
+  <div id="modal-info" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-sheet">
+      <h3>What do the buttons mean?</h3>
+      <ul class="info-list">
+        <li>
+          <span class="info-badge again">Again</span>
+          <span>You didn't know it. The card comes back <strong>today</strong> and the interval resets.</span>
+        </li>
+        <li>
+          <span class="info-badge good">Good</span>
+          <span>You knew it with some effort. Normal schedule: next review in ~1 day, then 6 days, then roughly <strong>2.5× longer</strong> each time.</span>
+        </li>
+        <li>
+          <span class="info-badge easy">Easy</span>
+          <span>You knew it instantly. Same as Good but the next interval is <strong>30% longer</strong>, and future intervals grow faster.</span>
+        </li>
+      </ul>
+      <p class="info-tip">💡 Most people just use <strong>Again</strong> and <strong>Good</strong>.</p>
+      <button id="btn-info-close" class="btn-primary">Got it</button>
     </div>
   </div>
 

@@ -304,6 +304,86 @@ html, body {
 
 .grade-btn.highlighted { box-shadow: 0 0 0 3px currentColor; }
 
+/* info button */
+.btn-info {
+  background: none;
+  border: 2px solid #ddd;
+  color: var(--gray);
+  border-radius: 50%;
+  width: 46px; height: 46px;
+  font-size: 17px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+  align-self: center;
+}
+.btn-info:active { border-color: #aaa; }
+
+/* ── Info modal ─────────────────────────────────────────────────────── */
+.modal {
+  position: fixed; inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.45);
+}
+
+.modal-sheet {
+  position: relative;
+  background: white;
+  border-radius: 24px 24px 0 0;
+  padding: 28px 24px max(28px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.modal-sheet h3 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.info-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.info-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.info-badge {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 3px 10px;
+  margin-top: 1px;
+}
+.info-badge.again { background: #fdecea; color: #c0392b; }
+.info-badge.good  { background: #e8f4fd; color: #2980b9; }
+.info-badge.easy  { background: #eafaf1; color: #27ae60; }
+
+.info-tip {
+  font-size: 14px;
+  color: var(--gray);
+  background: var(--light);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
 /* ── Done screen ────────────────────────────────────────────────────── */
 #screen-done {
   align-items: center;
