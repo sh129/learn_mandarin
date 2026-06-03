@@ -669,9 +669,9 @@ function hfHandleAnswer(card, correct) {
 // One repeat-after-me attempt — not graded, just practice echo
 function hfRepeatStep(card, onDone) {
   if (!handsFreeActive || !SpeechRecognition) { onDone(); return; }
-  el.speechStatus.textContent = isZhEn ? '🎙 Say it in English…' : '🎙 Your turn…';
 
   const isZhEn = card._direction === 'zh-en';
+  el.speechStatus.textContent = isZhEn ? '🎙 Say it in English…' : '🎙 Your turn…';
   let handled  = false;
 
   // Use a LOCAL reference — the global hfRecognition may be reassigned by
