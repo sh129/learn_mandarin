@@ -102,7 +102,7 @@ function speak(text) {
   speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'zh-CN';
-  utterance.rate = 0.8;
+  utterance.rate = 0.65;
   el.btnTts.classList.add('speaking');
   utterance.onend = () => el.btnTts.classList.remove('speaking');
   utterance.onerror = () => el.btnTts.classList.remove('speaking');
@@ -126,14 +126,19 @@ function _makeWAV(freq, dur, gain, endFreq) {
   for (let i = 0; i < n; i++) {
     const frac = i / n;
     const f    = endFreq ? freq + (endFreq - freq) * frac : freq;
-    const env  = Math.min(frac / 0.05, 1) * Math.min((1 - frac) / 0.2, 1);
-    d.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * f * (i / rate)) * gain * env * 32767), true);
+    // Slower attack (10%), longer release (30%) = softer feel
+    const env  = Math.min(frac / 0.1, 1) * Math.min((1 - frac) / 0.3, 1);
+    // Mix fundamental + 2nd harmonic at 25% — gives a warmer bell/marimba quality
+    const sample = Math.sin(2 * Math.PI * f * (i / rate)) * 0.75
+                 + Math.sin(2 * Math.PI * f * 2 * (i / rate)) * 0.25;
+    d.setInt16(44 + i * 2, Math.round(sample * gain * env * 32767), true);
   }
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
 }
 
-const _CORRECT_URL   = _makeWAV(880, 0.18, 0.3);          // A5 ding
-const _INCORRECT_URL = _makeWAV(260, 0.22, 0.2, 120);     // descending whomp
+// C5 (523 Hz) — lower and warmer than A5, less robotic
+const _CORRECT_URL   = _makeWAV(523, 0.22, 0.25);
+const _INCORRECT_URL = _makeWAV(260, 0.22, 0.18, 120);    // descending whomp (unchanged)
 
 function playCorrectSound()   { try { new Audio(_CORRECT_URL).play();   } catch(e) {} }
 function playIncorrectSound() { try { new Audio(_INCORRECT_URL).play(); } catch(e) {} }
@@ -302,16 +307,19 @@ function renderCard() {
 function flipCard() {
   cardFlipped = !cardFlipped;
   el.card.classList.toggle('flipped', cardFlipped);
-  el.frontButtons.classList.toggle('hidden', cardFlipped);
-  el.backButtons.classList.toggle('hidden', !cardFlipped);
 
-  if (!cardFlipped) {
-    // Flipped back to English side — clear speech feedback
-    el.speechResult.className = 'hidden';
-    el.speechStatus.textContent = '';
-    if (window.speechSynthesis) speechSynthesis.cancel();
-    el.btnTts.classList.remove('speaking');
-    document.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('highlighted'));
+  // In hands-free mode never show/hide the grade buttons — HF controls the footer
+  if (!handsFreeActive) {
+    el.frontButtons.classList.toggle('hidden', cardFlipped);
+    el.backButtons.classList.toggle('hidden', !cardFlipped);
+
+    if (!cardFlipped) {
+      el.speechResult.className = 'hidden';
+      el.speechStatus.textContent = '';
+      if (window.speechSynthesis) speechSynthesis.cancel();
+      el.btnTts.classList.remove('speaking');
+      document.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('highlighted'));
+    }
   }
 }
 
@@ -655,7 +663,7 @@ function hfSpeak(text, lang, onEnd) {
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang;
-  u.rate = lang === 'zh-CN' ? 0.8 : 0.95;
+  u.rate = lang === 'zh-CN' ? 0.65 : 0.95;
   let fired = false;
   const done = () => { if (!fired) { fired = true; if (onEnd) onEnd(); } };
   u.onend = done;
@@ -718,6 +726,7 @@ document.querySelector('.modal-backdrop').addEventListener('click', () => {
 document.getElementById('direction-row').addEventListener('click', (e) => {
   const btn = e.target.closest('.dir-btn');
   if (!btn) return;
+  if (handsFreeActive) stopHandsFreeMode();
   activeDirection = btn.dataset.dir;
   document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -730,6 +739,7 @@ document.getElementById('direction-row').addEventListener('click', (e) => {
 document.getElementById('filter-row').addEventListener('click', (e) => {
   const btn = e.target.closest('.filter-btn');
   if (!btn) return;
+  if (handsFreeActive) stopHandsFreeMode();
   activeCategory = btn.dataset.category;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -740,6 +750,7 @@ document.getElementById('filter-row').addEventListener('click', (e) => {
 
 // Add card nav button
 document.getElementById('btn-add-nav').addEventListener('click', () => {
+  if (handsFreeActive) stopHandsFreeMode();
   renderCustomList();
   showScreen('add');
 });
