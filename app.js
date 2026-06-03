@@ -8,7 +8,9 @@ let queue         = [];
 let queueIndex    = 0;
 let sessionCorrect = 0;
 let cardFlipped   = false;
-let activeCategory = 'all';
+let activeCategory  = 'all';
+let handsFreeActive = false;
+let hfRecognition   = null;
 
 const CATEGORY_LABELS = {
   all:        'All',
@@ -196,12 +198,14 @@ function renderCard() {
 
   // Reset to English (front) side
   el.card.classList.remove('flipped');
-  el.frontButtons.classList.remove('hidden');
-  el.backButtons.classList.add('hidden');
-  el.speechResult.className = 'hidden';
-  el.speechStatus.textContent = '';
-  if (window.speechSynthesis) speechSynthesis.cancel();
-  el.btnTts.classList.remove('speaking');
+  if (!handsFreeActive) {
+    el.frontButtons.classList.remove('hidden');
+    el.backButtons.classList.add('hidden');
+    el.speechResult.className = 'hidden';
+    el.speechStatus.textContent = '';
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    el.btnTts.classList.remove('speaking');
+  }
 
   // Clear grade highlights
   document.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('highlighted'));
@@ -409,6 +413,131 @@ function deleteCustomCard(index) {
   renderCustomList();
 }
 
+// ── Hands-free mode ───────────────────────────────────────────────────────────
+
+function startHandsFreeMode() {
+  if (!SpeechRecognition) {
+    el.speechStatus.textContent = 'Speech recognition not supported in this browser.';
+    return;
+  }
+  handsFreeActive = true;
+  document.getElementById('btn-hf-start').classList.add('hf-active');
+  el.frontButtons.classList.add('hidden');
+  el.backButtons.classList.add('hidden');
+  document.getElementById('hf-buttons').classList.remove('hidden');
+  el.speechResult.className = 'hidden';
+  hfRunCard();
+}
+
+function stopHandsFreeMode() {
+  handsFreeActive = false;
+  if (hfRecognition) { try { hfRecognition.abort(); } catch (e) {} hfRecognition = null; }
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  document.getElementById('btn-hf-start').classList.remove('hf-active');
+  document.getElementById('hf-buttons').classList.add('hidden');
+  el.frontButtons.classList.remove('hidden');
+  el.backButtons.classList.add('hidden');
+  el.speechStatus.textContent = '';
+  el.speechResult.className = 'hidden';
+  if (cardFlipped) flipCard();
+}
+
+function hfRunCard() {
+  if (!handsFreeActive) return;
+  if (queueIndex >= queue.length) {
+    const msg = `Session complete! You got ${sessionCorrect} out of ${queue.length} correct.`;
+    el.speechStatus.textContent = msg;
+    hfSpeak(msg, 'en-US', () => { stopHandsFreeMode(); showDone(); });
+    return;
+  }
+  renderCard();
+  const card = queue[queueIndex];
+  el.speechStatus.textContent = '▶ ' + card.english;
+  hfSpeak(card.english, 'en-US', () => {
+    if (!handsFreeActive) return;
+    setTimeout(() => hfListen(card), 400);
+  });
+}
+
+function hfListen(card) {
+  if (!handsFreeActive) return;
+  el.speechStatus.textContent = '🎙 Listening… (say it or "pass")';
+  let handled = false;
+
+  hfRecognition = new SpeechRecognition();
+  hfRecognition.lang = 'zh-CN';
+  hfRecognition.interimResults = false;
+  hfRecognition.maxAlternatives = 3;
+
+  hfRecognition.onresult = (e) => {
+    if (handled) return;
+    handled = true;
+    const alts = Array.from(e.results[0]).map(r => r.transcript.trim());
+    const raw = alts[0].toLowerCase();
+    if (raw.includes('pass') || raw.includes('跳') || raw.includes('不知道')) {
+      hfHandlePass(card);
+    } else {
+      hfHandleAnswer(card, checkSpeechMatch(alts, card.characters));
+    }
+  };
+
+  hfRecognition.onerror = (e) => {
+    if (handled || e.error === 'aborted') return;
+    handled = true;
+    hfHandlePass(card);
+  };
+
+  hfRecognition.start();
+}
+
+function hfHandlePass(card) {
+  if (!handsFreeActive) return;
+  el.speechStatus.textContent = `Pass — ${card.pinyin}`;
+  if (!cardFlipped) flipCard();
+  progress[card.id] = sm2(progress[card.id], 0);
+  saveProgress();
+  queueIndex++;
+  hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 700));
+}
+
+function hfHandleAnswer(card, correct) {
+  if (!handsFreeActive) return;
+  if (!cardFlipped) flipCard();
+  progress[card.id] = sm2(progress[card.id], correct ? 1 : 0);
+  saveProgress();
+  queueIndex++;
+  if (correct) {
+    sessionCorrect++;
+    el.speechStatus.textContent = '✓ Correct!';
+    hfSpeak('Correct!', 'en-US', () => setTimeout(() => hfRunCard(), 500));
+  } else {
+    el.speechStatus.textContent = `✗ ${card.pinyin}`;
+    hfSpeak('Not quite.', 'en-US', () =>
+      hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 700))
+    );
+  }
+}
+
+// Speak the characters in Chinese then the pinyin in English
+function hfSpeakAnswer(card, onEnd) {
+  hfSpeak(card.characters, 'zh-CN', () => hfSpeak(card.pinyin, 'en-US', onEnd));
+}
+
+// Reliable TTS wrapper — safety timeout guards against onend not firing on mobile
+function hfSpeak(text, lang, onEnd) {
+  if (!window.speechSynthesis) { setTimeout(onEnd || (() => {}), 300); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang;
+  u.rate = lang === 'zh-CN' ? 0.85 : 0.95;
+  let fired = false;
+  const done = () => { if (!fired) { fired = true; if (onEnd) onEnd(); } };
+  u.onend = done;
+  u.onerror = done;
+  setTimeout(done, Math.max(2500, text.length * 150));
+  speechSynthesis.speak(u);
+}
+
 // ── Event listeners ───────────────────────────────────────────────────────────
 // Tap card to flip (toggle front ↔ back)
 document.getElementById('card').addEventListener('click', () => {
@@ -439,6 +568,13 @@ document.getElementById('back-buttons').addEventListener('click', (e) => {
   if (!btn) return;
   gradeCard(parseInt(btn.dataset.grade, 10));
 });
+
+// Hands-free buttons
+document.getElementById('btn-hf-start').addEventListener('click', () => {
+  if (handsFreeActive) stopHandsFreeMode();
+  else startHandsFreeMode();
+});
+document.getElementById('btn-hf-stop').addEventListener('click', () => stopHandsFreeMode());
 
 // Info modal
 document.getElementById('btn-info').addEventListener('click', (e) => {

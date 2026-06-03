@@ -66,16 +66,21 @@ html, body {
   text-align: right;
 }
 
-#btn-add-nav {
+#btn-add-nav, #btn-hf-start {
   background: none;
   border: 2px solid var(--red);
   color: var(--red);
   border-radius: 50%;
   width: 32px; height: 32px;
-  font-size: 18px;
+  font-size: 15px;
   cursor: pointer;
   line-height: 1;
   flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+#btn-hf-start.hf-active {
+  background: var(--red);
+  animation: pulse 1.2s infinite;
 }
 
 /* ── Filter row ─────────────────────────────────────────────────────── */
@@ -576,6 +581,22 @@ html, body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* ── Hands-free stop button ─────────────────────────────────────────── */
+.btn-hf-stop {
+  width: 100%;
+  background: #2c3e50;
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  letter-spacing: 0.02em;
+}
+.btn-hf-stop:active { background: #1a252f; transform: scale(0.98); }
 
 /* ── No-speech fallback: hide speak button ─────────────────────────── */
 body.no-speech .btn-speak { display: none; }
