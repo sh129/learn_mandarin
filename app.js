@@ -9,8 +9,14 @@ let queueIndex    = 0;
 let sessionCorrect = 0;
 let cardFlipped   = false;
 let activeCategory  = 'all';
+let activeDirection = 'en-zh';  // 'en-zh' | 'zh-en' | 'both'
 let handsFreeActive = false;
 let hfRecognition   = null;
+
+// Progress key — EN→ZH reuses bare id (backward compat); ZH→EN gets '_zh' suffix
+function pKey(item) {
+  return item._direction === 'zh-en' ? item.id + '_zh' : item.id;
+}
 
 const CATEGORY_LABELS = {
   all:        'All',
@@ -175,10 +181,13 @@ function buildSession() {
     ? allCards
     : allCards.filter(c => c.category === activeCategory);
 
-  queue = pool.filter(card => {
-    const p = progress[card.id];
-    if (!p) return true;
-    return p.due <= t;
+  const dirs = activeDirection === 'both' ? ['en-zh', 'zh-en'] : [activeDirection];
+
+  queue = pool.flatMap(card =>
+    dirs.map(dir => ({ ...card, _direction: dir }))
+  ).filter(item => {
+    const p = progress[pKey(item)];
+    return !p || p.due <= t;
   });
 
   // Fisher-Yates shuffle
@@ -210,14 +219,46 @@ function renderCard() {
   // Clear grade highlights
   document.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('highlighted'));
 
-  // Front content
-  el.cardEnglish.textContent   = card.english;
+  const isZhEn = card._direction === 'zh-en';
   el.cardTypeBadge.textContent = card.type === 'phrase' ? 'phrase' : 'word';
 
-  // Back content (pre-populated so the flip reveals it instantly)
-  el.cardChars.textContent   = card.characters;
-  el.cardPinyin.textContent  = card.pinyin;
-  el.cardEnSmall.textContent = card.english;
+  // ── Front face ──────────────────────────────────────────────────────
+  const frontPinyin = document.getElementById('card-front-pinyin');
+  const hintText    = document.getElementById('card-hint-text');
+  if (isZhEn) {
+    el.card.classList.add('zh-en-front');
+    el.cardEnglish.textContent = card.characters;
+    frontPinyin.textContent    = card.pinyin;
+    frontPinyin.classList.remove('hidden');
+    hintText.textContent = 'tap to reveal English';
+  } else {
+    el.card.classList.remove('zh-en-front');
+    el.cardEnglish.textContent = card.english;
+    frontPinyin.textContent    = '';
+    frontPinyin.classList.add('hidden');
+    hintText.textContent = 'tap card to reveal';
+  }
+
+  // ── Back face ───────────────────────────────────────────────────────
+  const literalEl = document.getElementById('card-literal');
+  if (isZhEn) {
+    el.card.classList.add('zh-en-back');
+    el.cardChars.textContent   = card.english;
+    el.cardPinyin.textContent  = card.characters + '  ·  ' + card.pinyin;
+    el.cardEnSmall.textContent = '';
+    literalEl.classList.add('hidden');
+  } else {
+    el.card.classList.remove('zh-en-back');
+    el.cardChars.textContent   = card.characters;
+    el.cardPinyin.textContent  = card.pinyin;
+    el.cardEnSmall.textContent = card.english;
+    if (card.literal) {
+      literalEl.textContent = card.literal;
+      literalEl.classList.remove('hidden');
+    } else {
+      literalEl.classList.add('hidden');
+    }
+  }
 
   // Progress
   const done  = queueIndex;
@@ -245,7 +286,7 @@ function flipCard() {
 // ── Grading ───────────────────────────────────────────────────────────────────
 function gradeCard(level) {
   const card = queue[queueIndex];
-  progress[card.id] = sm2(progress[card.id], level);
+  progress[pKey(card)] = sm2(progress[pKey(card)], level);
   saveProgress();
 
   if (level >= 1) sessionCorrect++;
@@ -452,8 +493,11 @@ function hfRunCard() {
   }
   renderCard();
   const card = queue[queueIndex];
-  el.speechStatus.textContent = '▶ ' + card.english;
-  hfSpeak(card.english, 'en-US', () => {
+  const isZhEn = card._direction === 'zh-en';
+  el.speechStatus.textContent = '▶ ' + (isZhEn ? card.characters : card.english);
+  const promptText = isZhEn ? card.characters : card.english;
+  const promptLang = isZhEn ? 'zh-CN' : 'en-US';
+  hfSpeak(promptText, promptLang, () => {
     if (!handsFreeActive) return;
     setTimeout(() => hfListen(card), 400);
   });
@@ -469,6 +513,9 @@ function hfListen(card) {
   hfRecognition.interimResults = false;
   hfRecognition.maxAlternatives = 3;
 
+  const isZhEn = card._direction === 'zh-en';
+  hfRecognition.lang = isZhEn ? 'en-US' : 'zh-CN';
+
   hfRecognition.onresult = (e) => {
     if (handled) return;
     handled = true;
@@ -476,6 +523,12 @@ function hfListen(card) {
     const raw = alts[0].toLowerCase();
     if (raw.includes('pass') || raw.includes('跳') || raw.includes('不知道')) {
       hfHandlePass(card);
+    } else if (isZhEn) {
+      const correct = alts.some(a =>
+        a.toLowerCase().includes(card.english.toLowerCase()) ||
+        card.english.toLowerCase().includes(a.toLowerCase())
+      );
+      hfHandleAnswer(card, correct);
     } else {
       hfHandleAnswer(card, checkSpeechMatch(alts, card.characters));
     }
@@ -492,9 +545,10 @@ function hfListen(card) {
 
 function hfHandlePass(card) {
   if (!handsFreeActive) return;
-  el.speechStatus.textContent = `Pass — ${card.pinyin}`;
+  const isZhEn = card._direction === 'zh-en';
+  el.speechStatus.textContent = isZhEn ? `Pass — ${card.english}` : `Pass — ${card.pinyin}`;
   if (!cardFlipped) flipCard();
-  progress[card.id] = sm2(progress[card.id], 0);
+  progress[pKey(card)] = sm2(progress[pKey(card)], 0);
   saveProgress();
   queueIndex++;
   hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 700));
@@ -503,7 +557,7 @@ function hfHandlePass(card) {
 function hfHandleAnswer(card, correct) {
   if (!handsFreeActive) return;
   if (!cardFlipped) flipCard();
-  progress[card.id] = sm2(progress[card.id], correct ? 1 : 0);
+  progress[pKey(card)] = sm2(progress[pKey(card)], correct ? 1 : 0);
   saveProgress();
   queueIndex++;
   if (correct) {
@@ -511,16 +565,22 @@ function hfHandleAnswer(card, correct) {
     el.speechStatus.textContent = '✓ Correct!';
     hfSpeak('Correct!', 'en-US', () => setTimeout(() => hfRunCard(), 500));
   } else {
-    el.speechStatus.textContent = `✗ ${card.pinyin}`;
+    const isZhEn = card._direction === 'zh-en';
+    el.speechStatus.textContent = isZhEn ? `✗ ${card.english}` : `✗ ${card.pinyin}`;
     hfSpeak('Not quite.', 'en-US', () =>
       hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 700))
     );
   }
 }
 
-// Speak the characters in Chinese then the pinyin in English
+// For EN→ZH: speak characters in Chinese then pinyin in English
+// For ZH→EN: speak the English answer
 function hfSpeakAnswer(card, onEnd) {
-  hfSpeak(card.characters, 'zh-CN', () => hfSpeak(card.pinyin, 'en-US', onEnd));
+  if (card._direction === 'zh-en') {
+    hfSpeak(card.english, 'en-US', onEnd);
+  } else {
+    hfSpeak(card.characters, 'zh-CN', () => hfSpeak(card.pinyin, 'en-US', onEnd));
+  }
 }
 
 // Reliable TTS wrapper — safety timeout guards against onend not firing on mobile
@@ -586,6 +646,18 @@ document.getElementById('btn-info-close').addEventListener('click', () => {
 });
 document.querySelector('.modal-backdrop').addEventListener('click', () => {
   document.getElementById('modal-info').classList.add('hidden');
+});
+
+// Direction row
+document.getElementById('direction-row').addEventListener('click', (e) => {
+  const btn = e.target.closest('.dir-btn');
+  if (!btn) return;
+  activeDirection = btn.dataset.dir;
+  document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  buildSession();
+  if (queue.length === 0) showDone();
+  else { showScreen('study'); renderCard(); }
 });
 
 // Filter row

@@ -22,6 +22,12 @@
       <button id="btn-add-nav" title="Add card">＋</button>
     </header>
 
+    <div id="direction-row" role="group" aria-label="Practice direction">
+      <button class="dir-btn active" data-dir="en-zh">EN → 中</button>
+      <button class="dir-btn" data-dir="zh-en">中 → EN</button>
+      <button class="dir-btn" data-dir="both">Both</button>
+    </div>
+
     <div id="filter-row" role="group" aria-label="Filter by category">
       <!-- populated by JS -->
     </div>
@@ -32,12 +38,14 @@
           <div class="card-face card-front">
             <span id="card-type-badge"></span>
             <p id="card-english"></p>
-            <p class="hint">tap card to reveal</p>
+            <p id="card-front-pinyin" class="card-front-pinyin hidden"></p>
+            <p class="hint" id="card-hint-text">tap card to reveal</p>
           </div>
           <div class="card-face card-back">
             <p id="card-characters"></p>
             <p id="card-pinyin"></p>
             <p id="card-english-small"></p>
+            <p id="card-literal" class="card-literal hidden"></p>
             <button id="btn-tts" class="btn-tts" title="Hear it">🔊</button>
           </div>
         </div>

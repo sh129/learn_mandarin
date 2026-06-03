@@ -83,6 +83,38 @@ html, body {
   animation: pulse 1.2s infinite;
 }
 
+/* ── Direction row ──────────────────────────────────────────────────── */
+#direction-row {
+  display: flex;
+  gap: 0;
+  padding: 8px 16px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.dir-btn {
+  flex: 1;
+  border: 1.5px solid #ddd;
+  background: white;
+  color: var(--gray);
+  padding: 7px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  letter-spacing: 0.02em;
+}
+.dir-btn:first-child { border-radius: 10px 0 0 10px; }
+.dir-btn:last-child  { border-radius: 0 10px 10px 0; }
+.dir-btn + .dir-btn  { border-left: none; }
+.dir-btn.active {
+  background: var(--red);
+  color: white;
+  border-color: var(--red);
+  z-index: 1;
+}
+
 /* ── Filter row ─────────────────────────────────────────────────────── */
 #filter-row {
   display: flex;
@@ -213,6 +245,43 @@ html, body {
   font-size: 14px;
   color: var(--gray);
   margin-top: 4px;
+}
+
+/* Pinyin shown on card FRONT in ZH→EN mode */
+.card-front-pinyin {
+  font-size: clamp(15px, 4vw, 20px);
+  color: var(--gray);
+  letter-spacing: 0.04em;
+}
+
+/* In ZH→EN mode, the main front text shows characters — make them big and red */
+#card.zh-en-front #card-english {
+  font-size: clamp(48px, 12vw, 72px);
+  color: var(--red);
+  line-height: 1.1;
+}
+
+/* Literal translation on card BACK */
+.card-literal {
+  font-size: 13px;
+  color: #aaa;
+  font-style: italic;
+  text-align: center;
+  line-height: 1.4;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 8px;
+  width: 100%;
+}
+
+/* In ZH→EN mode, the back shows English big and dark */
+#card.zh-en-back #card-characters {
+  font-size: clamp(22px, 6vw, 32px);
+  color: var(--text);
+  font-weight: 600;
+}
+#card.zh-en-back #card-pinyin {
+  font-size: 14px;
+  color: var(--gray);
 }
 
 /* TTS button */
