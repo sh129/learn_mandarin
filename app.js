@@ -109,6 +109,52 @@ function speak(text) {
   speechSynthesis.speak(utterance);
 }
 
+// ── Audio feedback ────────────────────────────────────────────────────────────
+let _audioCtx = null;
+
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+// Resume context on any tap so hands-free sounds work without a direct gesture
+document.addEventListener('click', () => {
+  if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume();
+});
+
+function _tone(freq, startTime, duration, gainVal, freqEnd) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const vol = ctx.createGain();
+    osc.connect(vol);
+    vol.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, startTime);
+    if (freqEnd) osc.frequency.linearRampToValueAtTime(freqEnd, startTime + duration);
+    vol.gain.setValueAtTime(gainVal, startTime);
+    vol.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  } catch (e) {}
+}
+
+function playCorrectSound() {
+  try {
+    const t = getAudioCtx().currentTime;
+    _tone(659, t,        0.09, 0.22);        // E5 — first note
+    _tone(988, t + 0.07, 0.14, 0.22);        // B5 — second note, slightly overlapping
+  } catch (e) {}
+}
+
+function playIncorrectSound() {
+  try {
+    const t = getAudioCtx().currentTime;
+    _tone(280, t, 0.22, 0.15, 130);          // descending soft whomp
+  } catch (e) {}
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function dateStr(d) {
   return d.toISOString().split('T')[0];
@@ -288,6 +334,7 @@ function flipCard() {
 
 // ── Grading ───────────────────────────────────────────────────────────────────
 function gradeCard(level) {
+  if (level >= 1) playCorrectSound(); else playIncorrectSound();
   const card = queue[queueIndex];
   progress[pKey(card)] = sm2(progress[pKey(card)], level);
   saveProgress();
@@ -565,6 +612,7 @@ function hfListen(card) {
 
 function hfHandlePass(card) {
   if (!handsFreeActive) return;
+  playIncorrectSound();
   const isZhEn = card._direction === 'zh-en';
   el.speechStatus.textContent = isZhEn ? `Pass — ${card.english}` : `Pass — ${card.pinyin}`;
   if (!cardFlipped) flipCard();
@@ -581,10 +629,12 @@ function hfHandleAnswer(card, correct) {
   saveProgress();
   queueIndex++;
   if (correct) {
+    playCorrectSound();
     sessionCorrect++;
     el.speechStatus.textContent = '✓ Correct!';
     hfSpeak('Correct!', 'en-US', () => setTimeout(() => hfRunCard(), 500));
   } else {
+    playIncorrectSound();
     const isZhEn = card._direction === 'zh-en';
     el.speechStatus.textContent = isZhEn ? `✗ ${card.english}` : `✗ ${card.pinyin}`;
     hfSpeak('Not quite.', 'en-US', () =>
