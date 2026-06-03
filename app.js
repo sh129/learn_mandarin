@@ -539,6 +539,8 @@ function stopHandsFreeMode() {
 
 function hfRunCard() {
   if (!handsFreeActive) return;
+  // Abort any stale recognition before starting the next card
+  if (hfRecognition) { try { hfRecognition.abort(); } catch (e) {} hfRecognition = null; }
   if (queueIndex >= queue.length) {
     const msg = `Session complete! You got ${sessionCorrect} out of ${queue.length} correct.`;
     el.speechStatus.textContent = msg;
@@ -553,7 +555,7 @@ function hfRunCard() {
   const promptLang = isZhEn ? 'zh-CN' : 'en-US';
   hfSpeak(promptText, promptLang, () => {
     if (!handsFreeActive) return;
-    setTimeout(() => hfListen(card), 400);
+    setTimeout(() => hfListen(card), 600);  // 600ms lets the mic fully release
   });
 }
 
@@ -599,17 +601,20 @@ function hfListen(card) {
           handled = true;
           hfHandlePass(card);
         } else {
-          // Restart — slightly longer delay for network/audio errors
-          setTimeout(attempt, e.error === 'no-speech' ? 200 : 800);
+          setTimeout(attempt, e.error === 'no-speech' ? 300 : 800);
         }
         return;
       }
-      // Fatal errors (not-allowed, service-not-allowed, etc.) — stop
       handled = true;
       hfHandlePass(card);
     };
 
-    hfRecognition.start();
+    // start() can throw if the mic isn't fully released yet — retry if so
+    try {
+      hfRecognition.start();
+    } catch (e) {
+      setTimeout(attempt, 600);
+    }
   }
 
   attempt();
@@ -662,23 +667,25 @@ function hfRepeatStep(card, onDone) {
   el.speechStatus.textContent = '🎙 Your turn…';
 
   const isZhEn = card._direction === 'zh-en';
-  let handled = false;
+  let handled  = false;
 
-  // 10-second window — generous but not the full minute
+  // Use a LOCAL reference — the global hfRecognition may be reassigned by
+  // the time this timeout fires, which would abort the wrong recognition.
+  const rec = new SpeechRecognition();
+  hfRecognition = rec;
+  rec.lang            = isZhEn ? 'en-US' : 'zh-CN';
+  rec.interimResults  = false;
+  rec.maxAlternatives = 3;
+
   const timeout = setTimeout(() => {
     if (handled) return;
     handled = true;
-    try { hfRecognition.abort(); } catch (e) {}
+    try { rec.abort(); } catch (e) {}   // abort THIS recognition, not the global
     el.speechStatus.textContent = '';
     onDone();
   }, 10000);
 
-  hfRecognition = new SpeechRecognition();
-  hfRecognition.lang            = isZhEn ? 'en-US' : 'zh-CN';
-  hfRecognition.interimResults  = false;
-  hfRecognition.maxAlternatives = 3;
-
-  hfRecognition.onresult = (e) => {
+  rec.onresult = (e) => {
     if (handled) return;
     handled = true;
     clearTimeout(timeout);
@@ -697,14 +704,20 @@ function hfRepeatStep(card, onDone) {
     }
   };
 
-  hfRecognition.onerror = (e) => {
+  rec.onerror = (e) => {
     if (handled || e.error === 'aborted') return;
     handled = true;
     clearTimeout(timeout);
     onDone();
   };
 
-  hfRecognition.start();
+  try {
+    rec.start();
+  } catch (e) {
+    clearTimeout(timeout);
+    handled = true;
+    setTimeout(onDone, 500);
+  }
 }
 
 // For EN→ZH: speak characters in Chinese only
