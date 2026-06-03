@@ -593,17 +593,18 @@ function hfListen(card) {
 
     hfRecognition.onerror = (e) => {
       if (handled || e.error === 'aborted') return;
-      if (e.error === 'no-speech') {
+      const retryable = ['no-speech', 'network', 'audio-capture'];
+      if (retryable.includes(e.error)) {
         if (Date.now() - startTime >= 60000) {
-          // Full minute elapsed — treat silence as a pass
           handled = true;
           hfHandlePass(card);
         } else {
-          // Still within the window — restart and keep waiting
-          setTimeout(attempt, 200);
+          // Restart — slightly longer delay for network/audio errors
+          setTimeout(attempt, e.error === 'no-speech' ? 200 : 800);
         }
         return;
       }
+      // Fatal errors (not-allowed, service-not-allowed, etc.) — stop
       handled = true;
       hfHandlePass(card);
     };
@@ -623,7 +624,7 @@ function hfHandlePass(card) {
   progress[pKey(card)] = sm2(progress[pKey(card)], 0);
   saveProgress();
   queueIndex++;
-  hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 700));
+  hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 3000));
 }
 
 function hfHandleAnswer(card, correct) {
@@ -636,13 +637,13 @@ function hfHandleAnswer(card, correct) {
     playCorrectSound();
     sessionCorrect++;
     el.speechStatus.textContent = '✓ Correct!';
-    hfSpeak('Correct!', 'en-US', () => setTimeout(() => hfRunCard(), 500));
+    hfSpeak('Correct!', 'en-US', () => setTimeout(() => hfRunCard(), 2000));
   } else {
     playIncorrectSound();
     const isZhEn = card._direction === 'zh-en';
     el.speechStatus.textContent = isZhEn ? `✗ ${card.english}` : `✗ ${card.pinyin}`;
     hfSpeak('Not quite.', 'en-US', () =>
-      hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 700))
+      hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 3000))
     );
   }
 }
