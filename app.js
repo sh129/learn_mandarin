@@ -561,7 +561,9 @@ function hfRunCard() {
 
 function hfListen(card) {
   if (!handsFreeActive) return;
-  el.speechStatus.textContent = '🎙 Listening… (say it or "pass")';
+  el.speechStatus.textContent = isZhEn
+    ? '🎙 Say the English… (or "pass")'
+    : '🎙 Say the Mandarin… (or "pass")';
 
   const isZhEn    = card._direction === 'zh-en';
   const startTime = Date.now();
@@ -629,9 +631,10 @@ function hfHandlePass(card) {
   progress[pKey(card)] = sm2(progress[pKey(card)], 0);
   saveProgress();
   queueIndex++;
+  const repeatPrompt = card._direction === 'zh-en' ? 'In English?' : 'Your turn.';
   hfSpeakAnswer(card, () =>
     setTimeout(() =>
-      hfSpeak('Your turn.', 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
+      hfSpeak(repeatPrompt, 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
     , 600)
   );
 }
@@ -651,10 +654,11 @@ function hfHandleAnswer(card, correct) {
     playIncorrectSound();
     const isZhEn = card._direction === 'zh-en';
     el.speechStatus.textContent = isZhEn ? `✗ ${card.english}` : `✗ ${card.pinyin}`;
+    const repeatPrompt = card._direction === 'zh-en' ? 'In English?' : 'Your turn.';
     hfSpeak('Not quite.', 'en-US', () =>
       hfSpeakAnswer(card, () =>
         setTimeout(() =>
-          hfSpeak('Your turn.', 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
+          hfSpeak(repeatPrompt, 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
         , 600)
       )
     );
@@ -664,7 +668,7 @@ function hfHandleAnswer(card, correct) {
 // One repeat-after-me attempt — not graded, just practice echo
 function hfRepeatStep(card, onDone) {
   if (!handsFreeActive || !SpeechRecognition) { onDone(); return; }
-  el.speechStatus.textContent = '🎙 Your turn…';
+  el.speechStatus.textContent = isZhEn ? '🎙 Say it in English…' : '🎙 Your turn…';
 
   const isZhEn = card._direction === 'zh-en';
   let handled  = false;
