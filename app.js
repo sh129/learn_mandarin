@@ -561,13 +561,14 @@ function hfRunCard() {
 
 function hfListen(card) {
   if (!handsFreeActive) return;
-  el.speechStatus.textContent = isZhEn
-    ? '🎙 Say the English… (or "pass")'
-    : '🎙 Say the Mandarin… (or "pass")';
 
   const isZhEn    = card._direction === 'zh-en';
   const startTime = Date.now();
   let handled     = false;
+
+  el.speechStatus.textContent = isZhEn
+    ? '🎙 Say the English… (or "pass")'
+    : '🎙 Say the Mandarin… (or "pass")';
 
   function attempt() {
     if (handled || !handsFreeActive) return;
