@@ -573,13 +573,13 @@ function hfHandleAnswer(card, correct) {
   }
 }
 
-// For EN→ZH: speak characters in Chinese then pinyin in English
+// For EN→ZH: speak characters in Chinese only
 // For ZH→EN: speak the English answer
 function hfSpeakAnswer(card, onEnd) {
   if (card._direction === 'zh-en') {
     hfSpeak(card.english, 'en-US', onEnd);
   } else {
-    hfSpeak(card.characters, 'zh-CN', () => hfSpeak(card.pinyin, 'en-US', onEnd));
+    hfSpeak(card.characters, 'zh-CN', onEnd);
   }
 }
 
