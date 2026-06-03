@@ -112,47 +112,49 @@ function speak(text) {
 // ── Audio feedback ────────────────────────────────────────────────────────────
 let _audioCtx = null;
 
-function getAudioCtx() {
-  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (_audioCtx.state === 'suspended') _audioCtx.resume();
-  return _audioCtx;
-}
-
-// Resume context on any tap so hands-free sounds work without a direct gesture
-document.addEventListener('click', () => {
-  if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume();
-});
-
-function _tone(freq, startTime, duration, gainVal, freqEnd) {
+// Create the context on the first user gesture so it starts in running state
+document.addEventListener('pointerdown', function warmAudio() {
+  if (_audioCtx) return;
   try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const vol = ctx.createGain();
-    osc.connect(vol);
-    vol.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, startTime);
-    if (freqEnd) osc.frequency.linearRampToValueAtTime(freqEnd, startTime + duration);
-    vol.gain.setValueAtTime(gainVal, startTime);
-    vol.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-    osc.start(startTime);
-    osc.stop(startTime + duration);
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (e) {}
+}, { passive: true });
+
+async function _playTones(tones) {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Wait for resume to fully complete before reading currentTime
+    if (_audioCtx.state !== 'running') await _audioCtx.resume();
+    const now = _audioCtx.currentTime;
+    tones.forEach(([freq, offset, dur, gain, freqEnd]) => {
+      const osc = _audioCtx.createOscillator();
+      const vol = _audioCtx.createGain();
+      osc.connect(vol);
+      vol.connect(_audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + offset);
+      if (freqEnd !== undefined) {
+        osc.frequency.linearRampToValueAtTime(freqEnd, now + offset + dur);
+      }
+      vol.gain.setValueAtTime(gain, now + offset);
+      vol.gain.exponentialRampToValueAtTime(0.001, now + offset + dur);
+      osc.start(now + offset);
+      osc.stop(now + offset + dur + 0.01);
+    });
   } catch (e) {}
 }
 
 function playCorrectSound() {
-  try {
-    const t = getAudioCtx().currentTime;
-    _tone(659, t,        0.09, 0.22);        // E5 — first note
-    _tone(988, t + 0.07, 0.14, 0.22);        // B5 — second note, slightly overlapping
-  } catch (e) {}
+  _playTones([
+    [659, 0,    0.09, 0.22],        // E5
+    [988, 0.07, 0.15, 0.22],        // B5
+  ]);
 }
 
 function playIncorrectSound() {
-  try {
-    const t = getAudioCtx().currentTime;
-    _tone(280, t, 0.22, 0.15, 130);          // descending soft whomp
-  } catch (e) {}
+  _playTones([
+    [280, 0, 0.22, 0.15, 130],      // descending whomp
+  ]);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
