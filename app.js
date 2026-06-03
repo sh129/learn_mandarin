@@ -624,7 +624,11 @@ function hfHandlePass(card) {
   progress[pKey(card)] = sm2(progress[pKey(card)], 0);
   saveProgress();
   queueIndex++;
-  hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 3000));
+  hfSpeakAnswer(card, () =>
+    setTimeout(() =>
+      hfSpeak('Your turn.', 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
+    , 600)
+  );
 }
 
 function hfHandleAnswer(card, correct) {
@@ -643,9 +647,64 @@ function hfHandleAnswer(card, correct) {
     const isZhEn = card._direction === 'zh-en';
     el.speechStatus.textContent = isZhEn ? `✗ ${card.english}` : `✗ ${card.pinyin}`;
     hfSpeak('Not quite.', 'en-US', () =>
-      hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 3000))
+      hfSpeakAnswer(card, () =>
+        setTimeout(() =>
+          hfSpeak('Your turn.', 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
+        , 600)
+      )
     );
   }
+}
+
+// One repeat-after-me attempt — not graded, just practice echo
+function hfRepeatStep(card, onDone) {
+  if (!handsFreeActive || !SpeechRecognition) { onDone(); return; }
+  el.speechStatus.textContent = '🎙 Your turn…';
+
+  const isZhEn = card._direction === 'zh-en';
+  let handled = false;
+
+  // 10-second window — generous but not the full minute
+  const timeout = setTimeout(() => {
+    if (handled) return;
+    handled = true;
+    try { hfRecognition.abort(); } catch (e) {}
+    el.speechStatus.textContent = '';
+    onDone();
+  }, 10000);
+
+  hfRecognition = new SpeechRecognition();
+  hfRecognition.lang            = isZhEn ? 'en-US' : 'zh-CN';
+  hfRecognition.interimResults  = false;
+  hfRecognition.maxAlternatives = 3;
+
+  hfRecognition.onresult = (e) => {
+    if (handled) return;
+    handled = true;
+    clearTimeout(timeout);
+    const alts    = Array.from(e.results[0]).map(r => r.transcript.trim());
+    const correct = isZhEn
+      ? alts.some(a => a.toLowerCase().includes(card.english.toLowerCase()) || card.english.toLowerCase().includes(a.toLowerCase()))
+      : checkSpeechMatch(alts, card.characters);
+    if (correct) {
+      playCorrectSound();
+      el.speechStatus.textContent = '✓ Nice!';
+      hfSpeak('Nice!', 'en-US', onDone);
+    } else {
+      playIncorrectSound();
+      el.speechStatus.textContent = 'Keep practicing…';
+      setTimeout(onDone, 1000);
+    }
+  };
+
+  hfRecognition.onerror = (e) => {
+    if (handled || e.error === 'aborted') return;
+    handled = true;
+    clearTimeout(timeout);
+    onDone();
+  };
+
+  hfRecognition.start();
 }
 
 // For EN→ZH: speak characters in Chinese only
