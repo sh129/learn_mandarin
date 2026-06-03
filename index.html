@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#c0392b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Mandarin Flashcards</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Study screen ─────────────────────────────────────────────────── -->
+  <div id="screen-study" class="screen hidden">
+    <header>
+      <div id="progress-bar-wrap">
+        <div id="progress-bar"></div>
+      </div>
+      <div id="progress-text">0 / 0</div>
+      <button id="btn-add-nav" title="Add card">＋</button>
+    </header>
+
+    <main>
+      <div id="card-scene">
+        <div id="card">
+          <div class="card-face card-front">
+            <span id="card-type-badge"></span>
+            <p id="card-english"></p>
+            <p class="hint">think it → tap to reveal</p>
+          </div>
+          <div class="card-face card-back hidden">
+            <p id="card-characters"></p>
+            <p id="card-pinyin"></p>
+            <p id="card-english-small"></p>
+          </div>
+        </div>
+      </div>
+
+      <div id="speech-area">
+        <div id="speech-status"></div>
+        <div id="speech-result" class="hidden"></div>
+      </div>
+    </main>
+
+    <footer>
+      <div id="front-buttons">
+        <button id="btn-speak" class="btn-speak">
+          <span class="mic-icon">🎙</span>
+          <span>Speak</span>
+        </button>
+        <button id="btn-reveal" class="btn-reveal">Reveal</button>
+      </div>
+
+      <div id="back-buttons" class="hidden">
+        <button class="grade-btn grade-again" data-grade="0">Again</button>
+        <button class="grade-btn grade-good"  data-grade="1">Good</button>
+        <button class="grade-btn grade-easy"  data-grade="2">Easy</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ── Done screen ──────────────────────────────────────────────────── -->
+  <div id="screen-done" class="screen hidden">
+    <div class="done-content">
+      <div class="done-icon">🎉</div>
+      <h1>Session complete!</h1>
+      <p id="done-stats"></p>
+      <p id="done-next"></p>
+      <button id="btn-add-from-done" class="btn-primary">＋ Add custom card</button>
+    </div>
+  </div>
+
+  <!-- ── Add card screen ──────────────────────────────────────────────── -->
+  <div id="screen-add" class="screen hidden">
+    <header class="add-header">
+      <button id="btn-back" class="btn-back">← Back</button>
+      <h2>Add Card</h2>
+    </header>
+
+    <form id="add-card-form">
+      <label>
+        English
+        <input id="new-english" type="text" placeholder="e.g. good morning" autocomplete="off" required>
+      </label>
+      <label>
+        Pinyin
+        <input id="new-pinyin" type="text" placeholder="e.g. zǎo shang hǎo" autocomplete="off" required>
+      </label>
+      <label>
+        Characters
+        <input id="new-characters" type="text" placeholder="e.g. 早上好" autocomplete="off" required>
+      </label>
+      <label>
+        Type
+        <select id="new-type">
+          <option value="word">Word</option>
+          <option value="phrase">Phrase</option>
+        </select>
+      </label>
+      <button type="submit" class="btn-primary">Add Card</button>
+    </form>
+
+    <div id="custom-card-list"></div>
+  </div>
+
+  <!-- ── Loading screen ──────────────────────────────────────────────── -->
+  <div id="screen-loading" class="screen">
+    <div class="loading-content">
+      <div class="loading-char">你</div>
+      <p>Loading cards…</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
