@@ -181,6 +181,10 @@ html, body {
   transform: rotateY(180deg);
 }
 
+#card.no-transition {
+  transition: none !important;
+}
+
 .card-face {
   position: absolute; inset: 0;
   background: var(--card-bg);

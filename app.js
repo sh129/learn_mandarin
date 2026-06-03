@@ -102,7 +102,7 @@ function speak(text) {
   speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'zh-CN';
-  utterance.rate = 0.85;
+  utterance.rate = 0.8;
   el.btnTts.classList.add('speaking');
   utterance.onend = () => el.btnTts.classList.remove('speaking');
   utterance.onerror = () => el.btnTts.classList.remove('speaking');
@@ -205,8 +205,11 @@ function renderCard() {
   const card = queue[queueIndex];
   cardFlipped = false;
 
-  // Reset to English (front) side
+  // Snap instantly to English (front) side — no animation so the answer isn't visible during transition
+  el.card.classList.add('no-transition');
   el.card.classList.remove('flipped');
+  void el.card.offsetWidth; // force reflow before re-enabling transition
+  el.card.classList.remove('no-transition');
   if (!handsFreeActive) {
     el.frontButtons.classList.remove('hidden');
     el.backButtons.classList.add('hidden');
@@ -506,41 +509,58 @@ function hfRunCard() {
 function hfListen(card) {
   if (!handsFreeActive) return;
   el.speechStatus.textContent = '🎙 Listening… (say it or "pass")';
-  let handled = false;
 
-  hfRecognition = new SpeechRecognition();
-  hfRecognition.lang = 'zh-CN';
-  hfRecognition.interimResults = false;
-  hfRecognition.maxAlternatives = 3;
+  const isZhEn    = card._direction === 'zh-en';
+  const startTime = Date.now();
+  let handled     = false;
 
-  const isZhEn = card._direction === 'zh-en';
-  hfRecognition.lang = isZhEn ? 'en-US' : 'zh-CN';
+  function attempt() {
+    if (handled || !handsFreeActive) return;
 
-  hfRecognition.onresult = (e) => {
-    if (handled) return;
-    handled = true;
-    const alts = Array.from(e.results[0]).map(r => r.transcript.trim());
-    const raw = alts[0].toLowerCase();
-    if (raw.includes('pass') || raw.includes('跳') || raw.includes('不知道')) {
+    hfRecognition = new SpeechRecognition();
+    hfRecognition.lang            = isZhEn ? 'en-US' : 'zh-CN';
+    hfRecognition.interimResults  = false;
+    hfRecognition.maxAlternatives = 3;
+
+    hfRecognition.onresult = (e) => {
+      if (handled) return;
+      handled = true;
+      const alts = Array.from(e.results[0]).map(r => r.transcript.trim());
+      const raw  = alts[0].toLowerCase();
+      if (raw.includes('pass') || raw.includes('跳') || raw.includes('不知道')) {
+        hfHandlePass(card);
+      } else if (isZhEn) {
+        const correct = alts.some(a =>
+          a.toLowerCase().includes(card.english.toLowerCase()) ||
+          card.english.toLowerCase().includes(a.toLowerCase())
+        );
+        hfHandleAnswer(card, correct);
+      } else {
+        hfHandleAnswer(card, checkSpeechMatch(alts, card.characters));
+      }
+    };
+
+    hfRecognition.onerror = (e) => {
+      if (handled || e.error === 'aborted') return;
+      if (e.error === 'no-speech') {
+        if (Date.now() - startTime >= 60000) {
+          // Full minute elapsed — treat silence as a pass
+          handled = true;
+          hfHandlePass(card);
+        } else {
+          // Still within the window — restart and keep waiting
+          setTimeout(attempt, 200);
+        }
+        return;
+      }
+      handled = true;
       hfHandlePass(card);
-    } else if (isZhEn) {
-      const correct = alts.some(a =>
-        a.toLowerCase().includes(card.english.toLowerCase()) ||
-        card.english.toLowerCase().includes(a.toLowerCase())
-      );
-      hfHandleAnswer(card, correct);
-    } else {
-      hfHandleAnswer(card, checkSpeechMatch(alts, card.characters));
-    }
-  };
+    };
 
-  hfRecognition.onerror = (e) => {
-    if (handled || e.error === 'aborted') return;
-    handled = true;
-    hfHandlePass(card);
-  };
+    hfRecognition.start();
+  }
 
-  hfRecognition.start();
+  attempt();
 }
 
 function hfHandlePass(card) {
@@ -589,7 +609,7 @@ function hfSpeak(text, lang, onEnd) {
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang;
-  u.rate = lang === 'zh-CN' ? 0.85 : 0.95;
+  u.rate = lang === 'zh-CN' ? 0.8 : 0.95;
   let fired = false;
   const done = () => { if (!fired) { fired = true; if (onEnd) onEnd(); } };
   u.onend = done;
