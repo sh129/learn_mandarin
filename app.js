@@ -555,7 +555,7 @@ function hfRunCard() {
   const promptLang = isZhEn ? 'zh-CN' : 'en-US';
   hfSpeak(promptText, promptLang, () => {
     if (!handsFreeActive) return;
-    setTimeout(() => hfListen(card), 600);  // 600ms lets the mic fully release
+    setTimeout(() => hfListen(card), 1200);  // 1200ms lets the recognition service fully reset
   });
 }
 
@@ -623,9 +623,9 @@ function hfListen(card) {
         setTimeout(() => {
           if (handled || !handsFreeActive) return;
           try { rec.start(); } catch(e2) { handled = true; hfHandlePass(card); }
-        }, 1000);
+        }, 1500);
       }
-    }, 250);
+    }, 600);
   };
 
   try {
@@ -647,12 +647,16 @@ function hfHandlePass(card) {
   progress[pKey(card)] = sm2(progress[pKey(card)], 0);
   saveProgress();
   queueIndex++;
-  const repeatPrompt = card._direction === 'zh-en' ? 'In English?' : 'Your turn.';
-  hfSpeakAnswer(card, () =>
-    setTimeout(() =>
-      hfSpeak(repeatPrompt, 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
-    , 600)
-  );
+  // Repeat step only for EN→ZH (echo the Mandarin); skip for ZH→EN
+  if (card._direction === 'zh-en') {
+    hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 3000));
+  } else {
+    hfSpeakAnswer(card, () =>
+      setTimeout(() =>
+        hfSpeak('Your turn.', 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
+      , 600)
+    );
+  }
 }
 
 function hfHandleAnswer(card, correct) {
@@ -670,14 +674,20 @@ function hfHandleAnswer(card, correct) {
     playIncorrectSound();
     const isZhEn = card._direction === 'zh-en';
     el.speechStatus.textContent = isZhEn ? `✗ ${card.english}` : `✗ ${card.pinyin}`;
-    const repeatPrompt = card._direction === 'zh-en' ? 'In English?' : 'Your turn.';
-    hfSpeak('Not quite.', 'en-US', () =>
-      hfSpeakAnswer(card, () =>
-        setTimeout(() =>
-          hfSpeak(repeatPrompt, 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
-        , 600)
-      )
-    );
+    // Repeat step only for EN→ZH (echo the Mandarin); skip for ZH→EN
+    if (card._direction === 'zh-en') {
+      hfSpeak('Not quite.', 'en-US', () =>
+        hfSpeakAnswer(card, () => setTimeout(() => hfRunCard(), 3000))
+      );
+    } else {
+      hfSpeak('Not quite.', 'en-US', () =>
+        hfSpeakAnswer(card, () =>
+          setTimeout(() =>
+            hfSpeak('Your turn.', 'en-US', () => hfRepeatStep(card, () => setTimeout(() => hfRunCard(), 2000)))
+          , 600)
+        )
+      );
+    }
   }
 }
 
